@@ -5,9 +5,7 @@ on:
   workflow_dispatch: {}
 env:
   COURSE_DOMAIN: vsepractical.applifting.dev
-permissions:
-  contents: read
-  packages: write
+  REGISTRY: registry.vsepractical.applifting.dev
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -23,20 +21,20 @@ jobs:
           OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           if [ "$REPO_NAME" = "edu-template" ]; then SLUG="$OWNER"; else SLUG="${REPO_NAME,,}"; fi
           echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
-          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
           echo "url=https://$SLUG.$COURSE_DOMAIN" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v3
+      - name: Login to registry
+        uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: registry.vsepractical.applifting.dev
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
       - name: Build & push backend
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/backend/Dockerfile.deploy
           push: true
-          tags: ghcr.io/${{ steps.slug.outputs.owner }}/${{ steps.slug.outputs.slug }}-backend:latest
+          tags: ${{ env.REGISTRY }}/${{ steps.slug.outputs.slug }}-backend:latest
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:
@@ -46,7 +44,7 @@ jobs:
           build-args: |
             VITE_API_URL=${{ steps.slug.outputs.url }}/api
             VITE_BETTER_AUTH_URL=${{ steps.slug.outputs.url }}
-          tags: ghcr.io/${{ steps.slug.outputs.owner }}/${{ steps.slug.outputs.slug }}-frontend:latest
+          tags: ${{ env.REGISTRY }}/${{ steps.slug.outputs.slug }}-frontend:latest
       - name: Trigger Coolify deploy
         if: env.COOLIFY_WEBHOOK != ''
         run: |
